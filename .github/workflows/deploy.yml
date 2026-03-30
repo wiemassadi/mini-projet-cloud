@@ -1,0 +1,38 @@
+name: CI/CD – Build et Deploy
+ 
+# Se déclenche à chaque push sur la branche main
+on:
+  push:
+    branches: [ main ]
+ 
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+ 
+    steps:
+      # Étape 1 : Récupérer le code
+      - name: 1. Checkout du code
+        uses: actions/checkout@v4
+
+      # Étape 2 : Se connecter à Docker Hub
+      - name: 2. Login Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+ 
+      # Étape 3 : Construire l'image Docker
+      - name: 3. Build de l'image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/flask-todo:latest ./app1
+          echo "Build terminé avec succès"
+ 
+      # Étape 4 : Envoyer sur Docker Hub
+      - name: 4. Push vers Docker Hub
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/flask-todo:latest
+          echo "Image envoyée sur Docker Hub"
+ 
+      # Étape 5 : Vérification
+      - name: 5. Vérification finale
+        run: echo "Pipeline CI/CD terminé avec succès!"
