@@ -31,12 +31,24 @@ jobs:
             exit 1
           fi
 
-      # Étape 3 : Préparer Buildx
-      - name: 3. Setup Docker Buildx
+      # Étape 3 : Vérifier explicitement le scope push du token
+      - name: 3. Vérifier le scope pull,push du token Docker Hub
+        run: |
+          SCOPE="repository:${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:pull,push"
+          RESPONSE=$(curl -sS -u "${{ env.DOCKERHUB_USERNAME }}:${{ secrets.DOCKERHUB_TOKEN }}" "https://auth.docker.io/token?service=registry.docker.io&scope=${SCOPE}")
+          TOKEN=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("token",""))' "$RESPONSE")
+          if [ -z "$TOKEN" ]; then
+            echo "Token Docker Hub invalide ou scope insuffisant (read/write requis)." >&2
+            echo "Vérifie que le PAT Docker Hub a au minimum Read + Write et accès au namespace ${{ env.DOCKERHUB_USERNAME }}." >&2
+            exit 1
+          fi
+
+      # Étape 4 : Préparer Buildx
+      - name: 4. Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Étape 4 : Se connecter à Docker Hub
-      - name: 4. Login Docker Hub
+      # Étape 5 : Se connecter à Docker Hub
+      - name: 5. Login Docker Hub
         uses: docker/login-action@v3
         with:
           registry: docker.io
@@ -44,8 +56,8 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           logout: false
  
-      # Étape 5 : Générer les tags Docker (latest + sha)
-      - name: 5. Docker metadata
+      # Étape 6 : Générer les tags Docker (latest + sha)
+      - name: 6. Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -54,17 +66,19 @@ jobs:
             type=raw,value=latest
             type=sha,format=short
 
-      # Étape 6 : Build et Push
-      - name: 6. Build & Push vers Docker Hub
+      # Étape 7 : Build et Push
+      - name: 7. Build & Push vers Docker Hub
         uses: docker/build-push-action@v6
         with:
           context: ./app1
           push: true
+          provenance: false
+          sbom: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      # Étape 7 : Vérification
-      - name: 7. Vérification finale
+      # Étape 8 : Vérification
+      - name: 8. Vérification finale
         run: |
           echo "Pipeline CI/CD terminé avec succès!"
           echo "Image publiée: ${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}"
